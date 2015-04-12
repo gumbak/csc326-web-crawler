@@ -1,0 +1,247 @@
+<!DOCTYPE HTML>
+		 <html> 
+		 <head> 
+				<title>CSC326 Search Engine</title> 
+				<style>
+					body {text-align:center; margin: auto; position: fixed; 
+						  top: 0; left: 0; bottom: 0; right: 0; vertical-align:middle;}
+				</style>
+				<script src="http://code.jquery.com/jquery-latest.js" type="text/javascript"></script>
+				<script type="text/javascript">
+					var access_token;
+					function getAccessToken(){
+						var xmlhttp;
+						if (window.XMLHttpRequest)
+							{// code for IE7+, Firefox, Chrome, Opera, Safari
+							xmlhttp=new XMLHttpRequest();
+							}
+						else
+							{// code for IE6, IE5
+							xmlhttp=new ActiveXObject("Microsoft.XMLHTTP");
+							}
+						xmlhttp.onreadystatechange=function()
+							{
+							if (xmlhttp.readyState==4 && xmlhttp.status==200)
+								{
+								window.access_token = xmlhttp.responseText;
+								disconnectUser();
+								}
+						}
+						xmlhttp.open("GET","/getAccessToken",true);
+						xmlhttp.send();
+					}
+					function disconnectUser() {
+						var revokeUrl = 'https://accounts.google.com/o/oauth2/revoke?token=' + window.access_token;
+						// Perform an asynchronous GET request.
+						$.ajax({
+							type: 'GET',
+							url: revokeUrl,
+							async: false,
+							contentType: "application/json",
+							dataType: 'jsonp',
+							success: function(nullResponse) {
+								// The response is always undefined.
+								//set access_token to signed_out
+								window.access_token = 'signed out';
+								assign(window.access_token);
+								//Sign user out of Google
+								myWindow = window.open('https://mail.google.com/mail/u/0/?logout&hl=en'); 
+								//Redirect to HomePage
+								//window.location.replace("http://ec2-54-225-76-58.compute-1.amazonaws.com/");
+								window.location.replace("http://ec2-54-204-43-174.compute-1.amazonaws.com");
+								myWindow.onload = function () { myWindow.close();};
+							},
+							error: function(e) {
+								
+								// Handle the error
+								// console.log(e);
+								// You could point users to manually disconnect if unsuccessful
+								// https://plus.google.com/apps
+							}
+						});
+					}
+
+					function assign(access_token){
+						var xmlhttp;
+						if (window.XMLHttpRequest)
+							{// code for IE7+, Firefox, Chrome, Opera, Safari
+							xmlhttp=new XMLHttpRequest();
+							}
+						else
+							{// code for IE6, IE5
+							xmlhttp=new ActiveXObject("Microsoft.XMLHTTP");
+							}
+						xmlhttp.onreadystatechange=function()
+							{
+							if (xmlhttp.readyState==4 && xmlhttp.status==200)
+							{
+							document.getElementById("myDiv").innerHTML=xmlhttp.responseText;
+							}
+							}
+						xmlhttp.open("GET","/setAccessToken?accesstk="+access_token,true);
+						xmlhttp.send();
+					}
+					function checkBtn(event) {
+						pagenm = event.target.name;
+						var xmlhttp;
+						if (window.XMLHttpRequest)
+						  {// code for IE7+, Firefox, Chrome, Opera, Safari
+						  xmlhttp=new XMLHttpRequest();
+						  }
+						else
+						  {// code for IE6, IE5
+						  xmlhttp=new ActiveXObject("Microsoft.XMLHTTP");
+						  }
+						xmlhttp.onreadystatechange=function()
+						  {
+								if (xmlhttp.readyState==4 && xmlhttp.status==200)
+								{
+								document.getElementById("myDiv").innerHTML=xmlhttp.responseText;
+								}
+						  }
+						xmlhttp.open("GET","/setPageNum?pagenm="+pagenm,true);
+						xmlhttp.send();	
+					}
+				</script>
+		 </head>
+		 <center>
+			<button id="revokeButton" name="revokeButton" onclick="getAccessToken()">Log Out</button>
+			<h1>Space Explorer <img src="http://goo.gl/2z51Zw" width="50" height="50"></h1>
+			<form action="/results" method="POST"> 
+				<b>Search Again: </b><input type="text" name="keyword"> 
+				<input type="submit" value="Submit"> 
+			</form>
+			<BR><BR>
+		
+			%#Show 10 results per page. Results include title, URL, and description (row[0] contains pagerank)
+			%#Results shown are based on the current page number 
+			%n = (int(cpagenum)-1)*maxres+1
+			<script type="text/javascript">
+				var rows;
+				var searchkey;
+				window.onload = function(){
+						if (!sessionStorage.getItem("time")){
+							preloadTop();
+						}
+						//get searchkey
+						getkey();
+						function preloadTop(){
+							//get top 20 keywords
+							var xmlhttp;
+							if (window.XMLHttpRequest){// code for IE7+, Firefox, Chrome, Opera, Safari
+								xmlhttp=new XMLHttpRequest();
+							}
+							else{// code for IE6, IE5
+								xmlhttp=new ActiveXObject("Microsoft.XMLHTTP");
+							}
+							xmlhttp.onreadystatechange=function(){
+								if (xmlhttp.readyState==4 && xmlhttp.status==200){
+									topkey=xmlhttp.responseText;
+									if (!topkey || topkey != "[]"){
+										var topArray = topkey.split(" ");
+										for (var a=0;a<topArray.length-1;a++){
+											getrows(topArray[a], "");
+										}
+									}
+									sessionStorage.setItem("time", "1");
+								}
+							}
+							xmlhttp.open("GET","/gettop?code=true",true);
+							xmlhttp.send();	
+						}
+
+						function getkey(){
+							var xmlhttp;
+							if (window.XMLHttpRequest)
+								{// code for IE7+, Firefox, Chrome, Opera, Safari
+								xmlhttp=new XMLHttpRequest();
+								}
+							else
+								{// code for IE6, IE5
+								xmlhttp=new ActiveXObject("Microsoft.XMLHTTP");
+								}
+							xmlhttp.onreadystatechange=function()
+								{
+									if (xmlhttp.readyState==4 && xmlhttp.status==200)
+									{
+									 searchkey=xmlhttp.responseText;
+										getrows(searchkey, "1");
+									}
+								}
+							xmlhttp.open("GET","/getSearchkey",true);
+							xmlhttp.send();	
+						}
+						function getrows(key, x){
+							//get rows
+							var rows = sessionStorage.getItem(key);
+							if (!rows || rows == "NULL" || rows == "null"){
+								//get from database
+								var xmlhttp2;
+								if (window.XMLHttpRequest){// code for IE7+, Firefox, Chrome, Opera, Safari
+									xmlhttp2=new XMLHttpRequest();
+									}
+								else{// code for IE6, IE5
+									xmlhttp2=new ActiveXObject("Microsoft.XMLHTTP");
+								}
+								xmlhttp2.onreadystatechange=function(){
+									if (xmlhttp2.readyState==4 && xmlhttp2.status==200){
+										rows=xmlhttp2.responseText;
+										sessionStorage.setItem(key, rows);
+										if (x){
+											//need to parse for more results
+											var url='<div style="height:450px; overflow: auto;"><table border="1"><tr> <th align=center>  URL  </th> </tr><div id="container"><div class="loadedcontent" min-height: 3000px;>'
+
+											if (rows != "[]"){
+												var temp = rows.replace('[', '');
+												var res = temp.split("(u'");
+													
+												if (res.length != 2){
+												  for (var i=1;i<res.length-1;i++){
+													url+='<tr><td align=center>'+res[i].replace("',),", "")+'</td></tr>';
+												  }
+												}
+
+												//last one
+												url += '<tr><td align=center>'+res[res.length-1].replace("',)]","")+'</td></tr>';	
+											}
+											else{
+												url += '<tr><td align=center> No Results </td></tr>';
+											}	
+											document.getElementById("myDiv1").innerHTML=url;
+										}
+									}
+								}
+								xmlhttp2.open("GET","/getrows?key="+key,true);
+								xmlhttp2.send();
+							}
+							else{
+								if (x){
+									//rows is already stored in cache
+									var url='<div style="height:450px; overflow: auto;"><table border="1"><tr> <th align=center>  URL  </th> </tr><div id="container"><div class="loadedcontent" min-height: 3000px;>'
+									if (rows != "[]"){
+										var temp = rows.replace('[', '');
+										var res = temp.split("(u'");		
+										if (res.length != 2){
+										  for (var i=1;i<res.length-1;i++){
+											url+='<tr><td align=center>'+res[i].replace("',),", "")+'</td></tr>';
+										  }
+										}
+
+										//last one
+										url += '<tr><td align=center>'+res[res.length-1].replace("',)]","")+'</td></tr>';	
+									}
+									else {
+										url += '<tr><td align=center> No Results </td></tr>';
+									}
+									document.getElementById("myDiv1").innerHTML=url;
+								}
+							}
+						}
+					}
+				</script>		
+			
+			<div id="myDiv1"></div>
+
+			</div></div>
+				 
+		
